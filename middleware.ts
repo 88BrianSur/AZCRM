@@ -6,6 +6,11 @@ export async function middleware(req: NextRequest) {
   // Create a response object
   const res = NextResponse.next()
 
+  // Skip middleware for login page to prevent redirect loops
+  if (req.nextUrl.pathname === "/auth/login") {
+    return res
+  }
+
   // Create a Supabase client specifically for the middleware
   const supabase = createMiddlewareClient({ req, res })
 
@@ -38,8 +43,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // If accessing auth pages with a session, redirect to dashboard
-  if ((req.nextUrl.pathname.startsWith("/auth/") || req.nextUrl.pathname === "/") && session) {
+  // If accessing root with a session, redirect to dashboard
+  if (req.nextUrl.pathname === "/" && session) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 
@@ -54,6 +59,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - auth/login (to prevent redirect loops)
      */
     "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
