@@ -13,7 +13,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
+export default function LoginForm({
+  callbackUrl = "/dashboard",
+  debugMode = false,
+}: { callbackUrl?: string; debugMode?: boolean }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -29,6 +32,12 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
     try {
       console.log("Attempting to sign in with:", email)
 
+      // Log debug info if in debug mode
+      if (debugMode) {
+        console.log("Debug mode enabled")
+        console.log("Current cookies:", document.cookie)
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -43,6 +52,12 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
 
       if (data.user) {
         console.log("User authenticated:", data.user.id)
+
+        if (debugMode) {
+          console.log("Auth response:", JSON.stringify(data))
+          console.log("Session:", data.session)
+          console.log("Cookies after auth:", document.cookie)
+        }
 
         // Check if user is in the database
         const { data: userData, error: userError } = await supabase
@@ -79,6 +94,21 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         } else {
           // Update last login time
           await supabase.from("users").update({ last_login: new Date().toISOString() }).eq("id", data.user.id)
+        }
+
+        // Verify session is stored in cookies before redirecting
+        const { data: sessionData } = await supabase.auth.getSession()
+
+        if (debugMode) {
+          console.log("Session verification:", sessionData)
+          console.log("Final cookies before redirect:", document.cookie)
+        }
+
+        if (!sessionData.session) {
+          console.error("Session not properly stored")
+          setError("Authentication succeeded but session was not properly stored. Please try again.")
+          setIsLoading(false)
+          return
         }
 
         // Redirect to callback URL or dashboard
