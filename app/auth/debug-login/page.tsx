@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react"
 import LoginForm from "@/components/auth/login-form"
 import { createClientSupabaseClient } from "@/lib/supabase/client"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function DebugLoginPage() {
   const [sessionStatus, setSessionStatus] = useState<{
@@ -61,60 +59,29 @@ export default function DebugLoginPage() {
   }, [supabase])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold">Debug Login Page</h1>
-          <p className="mt-2 text-gray-600">This page bypasses middleware checks for testing purposes</p>
-        </div>
-
-        {/* Session Status */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Session Status</CardTitle>
-            <CardDescription>Current authentication state</CardDescription>
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
+      <div className="w-full max-w-md space-y-8">
+        <Card className="border-2 border-yellow-400">
+          <CardHeader className="bg-yellow-50">
+            <CardTitle className="text-center text-xl font-bold">🔍 Debug Login Page</CardTitle>
+            <CardDescription className="text-center">
+              This page bypasses middleware for testing authentication
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            {sessionStatus.status === "checking" ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Checking authentication status...</AlertDescription>
-              </Alert>
-            ) : sessionStatus.status === "authenticated" ? (
-              <Alert className="bg-green-50 border-green-200">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-600">{sessionStatus.message}</AlertDescription>
-              </Alert>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{sessionStatus.message}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Cookie Debug Info */}
-            <div className="mt-4">
-              <h3 className="font-medium mb-2">Cookies:</h3>
-              <div className="bg-gray-50 p-2 rounded text-xs font-mono overflow-auto max-h-32">
-                {cookies.length > 0 ? (
-                  <ul className="list-disc pl-5">
-                    {cookies.map((cookie, i) => (
-                      <li key={i}>{cookie}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>No cookies found</p>
-                )}
-              </div>
+          <CardContent className="pt-4">
+            <div className="mb-4 p-3 bg-blue-50 rounded-md text-sm">
+              <p className="font-medium">Debug Information:</p>
+              <p>• Check browser console for detailed session logs</p>
+              <p>• Successful login will redirect to /dashboard</p>
+              <p>• Authentication errors will be displayed below</p>
             </div>
           </CardContent>
         </Card>
 
         <LoginForm callbackUrl="/dashboard" debugMode={true} />
 
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>This is a temporary debug page.</p>
-          <p>Use it to test login functionality without middleware interference.</p>
+        <div className="text-center text-sm text-gray-500 mt-4">
+          <p>Open your browser console (F12) to view detailed session information</p>
         </div>
       </div>
     </div>
