@@ -14,8 +14,12 @@ export function middleware(req: NextRequest) {
     console.log(`[Middleware] Token preview: ${token.substring(0, 10)}...`)
   }
 
-  // Allow access to login and Next.js system paths
-  if (req.nextUrl.pathname.startsWith("/auth/login") || req.nextUrl.pathname.startsWith("/_next")) {
+  // Allow access to login, debug-login, and Next.js system paths
+  if (
+    req.nextUrl.pathname.startsWith("/auth/login") ||
+    req.nextUrl.pathname.startsWith("/auth/debug-login") ||
+    req.nextUrl.pathname.startsWith("/_next")
+  ) {
     console.log(`[Middleware] Allowing access to public path: ${req.nextUrl.pathname}`)
     return NextResponse.next()
   }
