@@ -1,3 +1,22 @@
+// Temporarily disabled middleware for testing
+// To re-enable, remove the .disabled extension from the filename
+
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+
+// This is a dummy middleware that does nothing
+export function middleware(req: NextRequest) {
+  // Simply pass through all requests without any authentication checks
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: [
+    // Empty matcher means this middleware won't run on any routes
+  ],
+}
+
+/* ORIGINAL MIDDLEWARE (for reference, to restore later)
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
@@ -53,13 +72,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 }
+*/
