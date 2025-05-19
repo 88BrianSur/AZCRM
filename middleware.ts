@@ -1,42 +1,25 @@
-// Temporarily disabled middleware for testing
-// To re-enable, remove the .disabled extension from the filename
-
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// This is a dummy middleware that does nothing
 export function middleware(req: NextRequest) {
-  // Simply pass through all requests without any authentication checks
-  return NextResponse.next()
-}
+  // Public paths that don't require authentication
+  const publicPaths = [
+    "/auth/login",
+    "/auth/register",
+    "/auth/reset-password",
+    "/auth/update-password",
+    "/api/auth/callback",
+  ]
 
-export const config = {
-  matcher: [
-    // Empty matcher means this middleware won't run on any routes
-  ],
-}
+  // Check if the current path is public
+  const isPublicPath = publicPaths.some(
+    (path) => req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith(path),
+  )
 
-/* ORIGINAL MIDDLEWARE (for reference, to restore later)
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
-
-export async function middleware(req: NextRequest) {
-  // Create a response object
-  const res = NextResponse.next()
-
-  // Skip middleware for login page to prevent redirect loops
-  if (req.nextUrl.pathname === "/auth/login") {
-    return res
+  // If it's a public path, allow access without checking auth
+  if (isPublicPath) {
+    return NextResponse.next()
   }
-
-  // Create a Supabase client specifically for the middleware
-  const supabase = createMiddlewareClient({ req, res })
-
-  // This properly checks the session using Supabase's methods
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
 
   // Protected routes that require authentication
   const protectedRoutes = [
@@ -55,24 +38,31 @@ export async function middleware(req: NextRequest) {
     (route) => req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(`${route}/`),
   )
 
-  // If accessing a protected route without a session, redirect to login
-  if (isProtectedRoute && !session) {
-    const redirectUrl = new URL("/auth/login", req.url)
-    redirectUrl.searchParams.set("callbackUrl", req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+  // If it's a protected route, check for the sb-access-token cookie
+  if (isProtectedRoute) {
+    const token = req.cookies.get("sb-access-token")?.value
+
+    // If no token is found, redirect to login
+    if (!token) {
+      const redirectUrl = new URL("/auth/login", req.url)
+      redirectUrl.searchParams.set("callbackUrl", req.nextUrl.pathname)
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
-  // If accessing root with a session, redirect to dashboard
-  if (req.nextUrl.pathname === "/" && session) {
-    return NextResponse.redirect(new URL("/dashboard", req.url))
-  }
-
-  return res
+  // For all other routes, just proceed
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
     "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 }
-*/
