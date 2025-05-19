@@ -19,6 +19,7 @@ export default function DashboardPage() {
     upcomingAppointments: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -31,7 +32,7 @@ export default function DashboardPage() {
           .select("*", { count: "exact", head: true })
 
         if (clientsError) {
-          console.error("Error fetching clients count:", clientsError)
+          throw new Error(`Error fetching clients: ${clientsError.message}`)
         }
 
         // Fetch active clients count
@@ -41,7 +42,7 @@ export default function DashboardPage() {
           .eq("status", "Active")
 
         if (activeClientsError) {
-          console.error("Error fetching active clients count:", activeClientsError)
+          throw new Error(`Error fetching active clients: ${activeClientsError.message}`)
         }
 
         // Fetch notes count
@@ -50,7 +51,7 @@ export default function DashboardPage() {
           .select("*", { count: "exact", head: true })
 
         if (notesError) {
-          console.error("Error fetching notes count:", notesError)
+          throw new Error(`Error fetching notes: ${notesError.message}`)
         }
 
         // Fetch upcoming appointments count
@@ -60,7 +61,7 @@ export default function DashboardPage() {
           .gte("appointment_date", new Date().toISOString())
 
         if (appointmentsError) {
-          console.error("Error fetching appointments count:", appointmentsError)
+          throw new Error(`Error fetching appointments: ${appointmentsError.message}`)
         }
 
         setStats({
@@ -69,8 +70,9 @@ export default function DashboardPage() {
           totalNotes: totalNotes || 0,
           upcomingAppointments: upcomingAppointments || 0,
         })
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error)
+      } catch (err) {
+        console.error("Dashboard data fetch error:", err)
+        setError(err instanceof Error ? err.message : "Failed to load dashboard data")
       } finally {
         setLoading(false)
       }
@@ -81,6 +83,25 @@ export default function DashboardPage() {
 
   if (loading) {
     return <LoadingSpinner />
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-red-500">Error loading dashboard: {error}</div>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Try Again
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
