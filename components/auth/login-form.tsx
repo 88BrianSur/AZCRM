@@ -1,11 +1,9 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createClientSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,128 +11,102 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-export default function LoginForm({
-  callbackUrl = "/dashboard",
-  debugMode = false,
-}: { callbackUrl?: string; debugMode?: boolean }) {
+export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [envStatus, setEnvStatus] = useState<"checking" | "ok" | "error">("checking")
   const router = useRouter()
-  const supabase = createClientSupabaseClient()
+
+  // Check environment variables on component mount
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Missing Supabase environment variables")
+      setEnvStatus("error")
+    } else {
+      console.log("Environment variables present:", {
+        supabaseUrl: supabaseUrl.substring(0, 10) + "...",
+        keyLength: supabaseAnonKey.length,
+      })
+      setEnvStatus("ok")
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
 
-    try {
-      console.log("🔐 Login attempt with email:", email)
+    // Set a timeout to prevent infinite loading state
+    const timeoutId = setTimeout(() => {
+      if (isLoading) {
+        setIsLoading(false)
+        setError("Login request timed out. Please try again.")
+        console.error("Login timeout - request did not complete in 15 seconds")
+      }
+    }, 15000)
 
-      // Step 1: Attempt to sign in with Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
+    try {
+      console.log("Login attempt with:", email)
+
+      // Basic validation
+      if (!email || !password) {
+        clearTimeout(timeoutId)
+        setError("Email and password are required")
+        setIsLoading(false)
+        return
+      }
+
+      // Check environment variables again
+      if (envStatus === "error") {
+        clearTimeout(timeoutId)
+        setError("System configuration error. Please contact an administrator.")
+        setIsLoading(false)
+        return
+      }
+
+      // Import dynamically to avoid SSR issues
+      const { createClient } = await import("@supabase/supabase-js")
+
+      // Create a fresh client for this login attempt
+      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+
+      console.log("Supabase client created, attempting signInWithPassword")
+
+      // Attempt to sign in
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      // Log the full auth response regardless of success/failure
-      console.log("📊 Full Supabase auth response:", JSON.stringify(data, null, 2))
+      clearTimeout(timeoutId)
 
-      if (error) {
-        console.error("❌ Auth error:", error.message)
-        setError(error.message)
+      if (signInError) {
+        console.error("Auth error:", signInError.message)
+        setError(signInError.message)
         setIsLoading(false)
         return
       }
 
-      // Check if we have a user but no session (unusual case)
-      if (data.user && !data.session) {
-        console.error("⚠️ User authenticated but no session was returned")
-        setError("Authentication succeeded but no session was created. Please try again.")
+      if (!data.user || !data.session) {
+        console.error("No user or session returned")
+        setError("Authentication failed. Please try again.")
         setIsLoading(false)
         return
       }
 
-      if (!data.user) {
-        console.error("❌ No user returned from authentication")
-        setError("No user account found. Please check your credentials.")
-        setIsLoading(false)
-        return
-      }
+      console.log("User authenticated successfully, redirecting to:", callbackUrl)
 
-      // We have both user and session at this point
-      console.log("✅ User authenticated:", data.user.id)
-      console.log("🔑 Session details:", {
-        accessToken: data.session?.access_token
-          ? "Present (length: " + data.session.access_token.length + ")"
-          : "Missing",
-        refreshToken: data.session?.refresh_token
-          ? "Present (length: " + data.session.refresh_token.length + ")"
-          : "Missing",
-        expiresAt: data.session?.expires_at,
-        tokenType: data.session?.token_type,
-        provider: data.session?.provider,
-      })
-
-      // Step 2: Check if user is in the database
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", data.user.id)
-        .single()
-
-      if (userError && userError.code !== "PGRST116") {
-        console.error("❌ User data error:", userError.message)
-        setError("Error retrieving user profile. Please try again.")
-        setIsLoading(false)
-        return
-      }
-
-      // Step 3: If user doesn't exist in the database yet, create a basic profile
-      if (!userData) {
-        console.log("👤 Creating new user profile")
-        const { error: insertError } = await supabase.from("users").insert({
-          id: data.user.id,
-          email: data.user.email,
-          role: "staff", // Default role
-          created_at: new Date().toISOString(),
-          last_login: new Date().toISOString(),
-        })
-
-        if (insertError) {
-          console.error("❌ Error creating user profile:", insertError.message)
-          setError("Error creating user profile. Please contact an administrator.")
-          await supabase.auth.signOut()
-          setIsLoading(false)
-          return
-        }
-      } else {
-        // Update last login time
-        await supabase.from("users").update({ last_login: new Date().toISOString() }).eq("id", data.user.id)
-      }
-
-      // Step 4: Verify session is stored in cookies before redirecting
-      const { data: sessionData } = await supabase.auth.getSession()
-      console.log("🍪 Session verification after login:", JSON.stringify(sessionData, null, 2))
-
-      if (!sessionData.session) {
-        console.error("❌ Session not properly stored after successful login")
-        setError("Authentication succeeded but session was not properly stored. Please try again.")
-        setIsLoading(false)
-        return
-      }
-
-      // Log cookie information
-      console.log("🍪 Cookies after authentication:", document.cookie)
-
-      // Step 5: Redirect to callback URL or dashboard
-      console.log("🔄 Redirecting to:", callbackUrl)
+      // Redirect to callback URL or dashboard
       router.push(callbackUrl)
-      router.refresh()
     } catch (err) {
-      console.error("❌ Unexpected login error:", err)
-      setError("An unexpected error occurred. Please try again.")
+      clearTimeout(timeoutId)
+      console.error("Login error:", err)
+      setError(`An unexpected error occurred: ${err instanceof Error ? err.message : String(err)}`)
       setIsLoading(false)
     }
   }
@@ -146,12 +118,20 @@ export default function LoginForm({
         <CardDescription>Enter your credentials to access the dashboard</CardDescription>
       </CardHeader>
       <CardContent>
+        {envStatus === "error" && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Missing environment variables. Authentication will not work.</AlertDescription>
+          </Alert>
+        )}
+
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -181,7 +161,7 @@ export default function LoginForm({
               required
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || envStatus === "error"}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...

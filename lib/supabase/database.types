@@ -78,7 +78,7 @@ export interface Database {
           city?: string | null
           state?: string | null
           zip_code?: string | null
-          status: string
+          status?: string
           program_type?: string | null
           intake_date: string
           discharge_date?: string | null
