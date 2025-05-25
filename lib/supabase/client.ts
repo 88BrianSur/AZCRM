@@ -1,38 +1,55 @@
-import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@supabase/supabase-js"
 import type { Database } from "./database.types"
 
-// Create a singleton client for consistent usage
-let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
-
+// Simple client creation without SSR complications
 export function createClientSupabaseClient() {
-  if (!supabaseClient) {
-    // Make sure we have the environment variables
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("Missing Supabase environment variables")
-      throw new Error("Missing Supabase environment variables")
-    }
-
-    console.log("Creating Supabase client with URL:", supabaseUrl.substring(0, 15) + "...")
-
-    // Create the client without custom cookie handling to use document.cookie API automatically
-    supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Missing Supabase environment variables:", {
+      hasUrl: !!supabaseUrl,
+      hasKey: !!supabaseAnonKey,
+    })
+    throw new Error("Missing Supabase environment variables")
   }
 
-  return supabaseClient
+  console.log("Creating Supabase client with:", {
+    url: supabaseUrl.substring(0, 30) + "...",
+    keyLength: supabaseAnonKey.length,
+  })
+
+  // Use the standard createClient for better compatibility
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
 }
 
-// Helper function to get user session on the client side
+// Create a singleton instance
+let supabaseInstance: ReturnType<typeof createClientSupabaseClient> | null = null
+
+export function getSupabaseClient() {
+  if (!supabaseInstance) {
+    supabaseInstance = createClientSupabaseClient()
+  }
+  return supabaseInstance
+}
+
+// Helper functions
 export async function getSession() {
   try {
-    const client = createClientSupabaseClient()
-    const { data, error } = await client.auth.getSession()
+    const supabase = getSupabaseClient()
+    const { data, error } = await supabase.auth.getSession()
+
     if (error) {
-      console.error("Error getting session:", error.message)
+      console.error("Error getting session:", error)
       return null
     }
+
     return data.session
   } catch (err) {
     console.error("Exception getting session:", err)
@@ -40,15 +57,16 @@ export async function getSession() {
   }
 }
 
-// Helper function to get user data
 export async function getCurrentUser() {
   try {
-    const client = createClientSupabaseClient()
-    const { data, error } = await client.auth.getUser()
-    if (error || !data.user) {
-      console.error("Error getting user:", error?.message)
+    const supabase = getSupabaseClient()
+    const { data, error } = await supabase.auth.getUser()
+
+    if (error) {
+      console.error("Error getting user:", error)
       return null
     }
+
     return data.user
   } catch (err) {
     console.error("Exception getting user:", err)
@@ -56,26 +74,5 @@ export async function getCurrentUser() {
   }
 }
 
-// Helper function to get user profile with role information
-export async function getUserProfile() {
-  try {
-    const client = createClientSupabaseClient()
-    const user = await getCurrentUser()
-    if (!user) return null
-
-    const { data, error } = await client.from("users").select("*").eq("id", user.id).single()
-
-    if (error) {
-      console.error("Error getting user profile:", error.message)
-      return null
-    }
-
-    return data
-  } catch (err) {
-    console.error("Exception getting user profile:", err)
-    return null
-  }
-}
-
 // For backward compatibility
-export const supabase = createClientSupabaseClient()
+export const supabase = getSupabaseClient()

@@ -1,27 +1,27 @@
-import { redirect } from "next/navigation"
 import LoginForm from "@/components/auth/login-form"
-import { getServerSession } from "@/lib/supabase/server"
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: { callbackUrl?: string }
-}) {
-  // Check if user is already logged in
-  const session = await getServerSession()
-
-  // If logged in, redirect to dashboard
-  if (session) {
-    redirect(searchParams.callbackUrl || "/dashboard")
+interface LoginPageProps {
+  searchParams: {
+    callbackUrl?: string
+    error?: string
   }
+}
 
+export default function LoginPage({ searchParams }: LoginPageProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8">
-      <div className="w-full max-w-md">
-        <div className="mb-4 text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
           <h1 className="text-3xl font-bold">AZ House Platform</h1>
-          <p className="text-muted-foreground">Recovery Management System</p>
+          <p className="mt-2 text-gray-600">Recovery Management System</p>
         </div>
+
+        {searchParams.error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-800 text-sm">{searchParams.error}</p>
+          </div>
+        )}
+
         <LoginForm callbackUrl={searchParams.callbackUrl || "/dashboard"} />
       </div>
     </div>

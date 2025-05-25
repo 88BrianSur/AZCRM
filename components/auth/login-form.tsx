@@ -1,225 +1,192 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, Eye, EyeOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { createClientSupabaseClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
-export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+interface LoginFormProps {
+  callbackUrl?: string
+}
+
+export default function LoginForm({ callbackUrl = "/dashboard" }: LoginFormProps) {
+  const [email, setEmail] = useState("admin@example.com")
+  const [password, setPassword] = useState("password123")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [envStatus, setEnvStatus] = useState<"checking" | "ok" | "error">("checking")
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
-  const router = useRouter()
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
 
-  // Check if user is already logged in
-  useEffect(() => {
-    async function checkSession() {
-      try {
-        const supabase = createClientSupabaseClient()
-        const { data } = await supabase.auth.getSession()
+  const addDebug = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const debugMessage = `[${timestamp}] ${message}`
+    console.log(debugMessage)
+    setDebugInfo((prev) => [...prev, debugMessage])
+  }
 
-        if (data.session) {
-          console.log("User already logged in, redirecting to dashboard")
-          // Use window.location for a full page reload to ensure middleware picks up the session
-          window.location.href = callbackUrl
-        }
-      } catch (err) {
-        console.error("Error checking session:", err)
-      }
-    }
-
-    checkSession()
-  }, [callbackUrl])
-
-  // Check environment variables on component mount
-  useEffect(() => {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("Missing Supabase environment variables")
-      setEnvStatus("error")
-    } else {
-      console.log("Environment variables present:", {
-        supabaseUrl: supabaseUrl.substring(0, 10) + "...",
-        keyLength: supabaseAnonKey.length,
-      })
-      setEnvStatus("ok")
-    }
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setDebugInfo(null)
+    setSuccess(null)
     setIsLoading(true)
-
-    // Set a timeout to prevent infinite loading state
-    const timeoutId = setTimeout(() => {
-      if (isLoading) {
-        setIsLoading(false)
-        setError("Login request timed out. Please try again.")
-        console.error("Login timeout - request did not complete in 15 seconds")
-      }
-    }, 15000)
+    setDebugInfo([]) // Clear previous debug info
 
     try {
-      console.log("Login attempt with:", email)
+      addDebug("=== LOGIN ATTEMPT STARTED ===")
+      addDebug(`Email: ${email}`)
+      addDebug(`Target URL: ${callbackUrl}`)
 
-      // Basic validation
+      // Validate inputs
       if (!email || !password) {
-        clearTimeout(timeoutId)
-        setError("Email and password are required")
-        setIsLoading(false)
-        return
+        throw new Error("Email and password are required")
       }
 
-      // Check environment variables again
-      if (envStatus === "error") {
-        clearTimeout(timeoutId)
-        setError("System configuration error. Please contact an administrator.")
-        setIsLoading(false)
-        return
+      // Check environment variables
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!supabaseUrl || !supabaseKey) {
+        throw new Error("Supabase environment variables are not configured")
       }
 
-      // Get the Supabase client
-      const supabase = createClientSupabaseClient()
+      addDebug("Creating Supabase client...")
+      const supabase = getSupabaseClient()
+      addDebug("Supabase client created successfully")
 
-      console.log("Supabase client created, attempting signInWithPassword")
-
-      // Attempt to sign in
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      addDebug("Attempting to sign in...")
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
       })
 
-      clearTimeout(timeoutId)
-
-      if (signInError) {
-        console.error("Auth error:", signInError.message)
-        setError(signInError.message)
-        setIsLoading(false)
-        return
+      if (error) {
+        addDebug(`Authentication error: ${error.message}`)
+        throw new Error(error.message)
       }
 
       if (!data.user || !data.session) {
-        console.error("No user or session returned")
-        setError("Authentication failed. Please try again.")
-        setIsLoading(false)
-        return
+        addDebug("No user or session returned")
+        throw new Error("Authentication failed: No user or session data")
       }
 
-      // Show debug info
-      const debugText = `Login successful! User ID: ${data.user.id.substring(0, 6)}...
-Session expires: ${new Date(data.session.expires_at! * 1000).toLocaleString()}
-Redirecting to: ${callbackUrl}`
+      addDebug(`Authentication successful!`)
+      addDebug(`User: ${data.user.email}`)
+      addDebug(`Session expires: ${new Date(data.session.expires_at! * 1000).toISOString()}`)
 
-      setDebugInfo(debugText)
-      console.log(debugText)
+      setSuccess("Login successful! Redirecting...")
+      addDebug("Setting success message and preparing redirect...")
 
-      // Wait a moment to show the success message
+      // Wait a moment to ensure session is fully set, then redirect
       setTimeout(() => {
-        // Force a full page reload to ensure the session is picked up
+        addDebug(`Redirecting to: ${callbackUrl}`)
+        // Use a simple window.location redirect to avoid conflicts
         window.location.href = callbackUrl
-      }, 1000)
+      }, 1500) // Increased delay to ensure session is set
     } catch (err) {
-      clearTimeout(timeoutId)
-      console.error("Login error:", err)
-      setError(`An unexpected error occurred: ${err instanceof Error ? err.message : String(err)}`)
-      setIsLoading(false)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      addDebug(`Login failed: ${errorMessage}`)
+      setError(errorMessage)
+      setIsLoading(false) // Only set loading to false on error
     }
+    // Don't set isLoading to false on success - let the redirect happen
   }
 
   return (
-    <Card className="w-full mt-8">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-        <CardDescription>Enter your credentials to access the dashboard</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {envStatus === "error" && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Missing environment variables. Authentication will not work.</AlertDescription>
-          </Alert>
-        )}
+    <div className="w-full max-w-md mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Sign In</CardTitle>
+          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          {success && (
+            <Alert className="border-green-200 bg-green-50">
+              <AlertDescription className="text-green-800">{success}</AlertDescription>
+            </Alert>
+          )}
 
-        {debugInfo && (
-          <Alert className="mb-4 bg-green-50 border-green-200">
-            <AlertDescription className="text-green-800 whitespace-pre-line">{debugInfo}</AlertDescription>
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/auth/reset-password" className="text-sm text-primary hover:underline">
-                Forgot password?
-              </Link>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                required
+                autoComplete="email"
+              />
             </div>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={isLoading || envStatus === "error"}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...
-              </>
-            ) : (
-              "Sign in"
-            )}
-          </Button>
-        </form>
-      </CardContent>
-      <CardFooter className="flex flex-col space-y-4">
-        <div className="text-sm text-center text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="text-primary hover:underline">
-            Contact administrator
-          </Link>
-        </div>
-        <div className="text-xs text-center text-muted-foreground">
-          <p>Having trouble? Try these test credentials:</p>
-          <p>Email: admin@example.com</p>
-          <p>Password: password123</p>
-        </div>
-      </CardFooter>
-    </Card>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  required
+                  autoComplete="current-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {success ? "Redirecting..." : "Signing in..."}
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+
+          {/* Debug Information */}
+          {debugInfo.length > 0 && (
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm font-medium">Debug Information</summary>
+              <div className="mt-2 p-3 bg-gray-100 rounded text-xs font-mono max-h-40 overflow-y-auto">
+                {debugInfo.map((info, index) => (
+                  <div key={index} className="mb-1">
+                    {info}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <div className="text-sm text-center text-muted-foreground">Test credentials are pre-filled above</div>
+        </CardFooter>
+      </Card>
+    </div>
   )
 }
