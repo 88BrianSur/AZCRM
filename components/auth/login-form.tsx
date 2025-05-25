@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { createClientSupabaseClient } from "@/lib/supabase/client"
 
 export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [email, setEmail] = useState("")
@@ -69,11 +70,8 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         return
       }
 
-      // Import dynamically to avoid SSR issues
-      const { createClient } = await import("@supabase/supabase-js")
-
-      // Create a fresh client for this login attempt
-      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      // Get the Supabase client
+      const supabase = createClientSupabaseClient()
 
       console.log("Supabase client created, attempting signInWithPassword")
 
@@ -99,10 +97,13 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         return
       }
 
-      console.log("User authenticated successfully, redirecting to:", callbackUrl)
+      console.log("User authenticated successfully:", {
+        userId: data.user.id,
+        sessionExpiry: new Date(data.session.expires_at! * 1000).toISOString(),
+      })
 
-      // Redirect to callback URL or dashboard
-      router.push(callbackUrl)
+      // Refresh the page to ensure middleware picks up the new session
+      window.location.href = callbackUrl
     } catch (err) {
       clearTimeout(timeoutId)
       console.error("Login error:", err)
@@ -178,6 +179,11 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
           <Link href="/auth/register" className="text-primary hover:underline">
             Contact administrator
           </Link>
+        </div>
+        <div className="text-xs text-center text-muted-foreground">
+          <p>Having trouble? Try these test credentials:</p>
+          <p>Email: admin@example.com</p>
+          <p>Password: password123</p>
         </div>
       </CardFooter>
     </Card>

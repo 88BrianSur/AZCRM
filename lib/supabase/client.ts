@@ -1,12 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { Database } from "./database.types"
 
-// Direct export of the supabase client - this is what the application expects
-export const supabase = createBrowserClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-)
-
 // Create a singleton client for consistent usage
 let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null = null
 
@@ -21,7 +15,9 @@ export function createClientSupabaseClient() {
       throw new Error("Missing Supabase environment variables")
     }
 
-    // Create the client with the standard browser client
+    console.log("Creating Supabase client with URL:", supabaseUrl.substring(0, 15) + "...")
+
+    // Create the client without custom cookie handling to use document.cookie API automatically
     supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
   }
 
@@ -29,7 +25,7 @@ export function createClientSupabaseClient() {
 }
 
 // Helper function to get user session on the client side
-export const getSession = async () => {
+export async function getSession() {
   try {
     const client = createClientSupabaseClient()
     const { data, error } = await client.auth.getSession()
@@ -45,7 +41,7 @@ export const getSession = async () => {
 }
 
 // Helper function to get user data
-export const getCurrentUser = async () => {
+export async function getCurrentUser() {
   try {
     const client = createClientSupabaseClient()
     const { data, error } = await client.auth.getUser()
@@ -61,7 +57,7 @@ export const getCurrentUser = async () => {
 }
 
 // Helper function to get user profile with role information
-export const getUserProfile = async () => {
+export async function getUserProfile() {
   try {
     const client = createClientSupabaseClient()
     const user = await getCurrentUser()
@@ -80,3 +76,6 @@ export const getUserProfile = async () => {
     return null
   }
 }
+
+// For backward compatibility
+export const supabase = createClientSupabaseClient()

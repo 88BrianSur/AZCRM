@@ -1,39 +1,31 @@
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export function middleware(req: NextRequest) {
-  // Get the token from cookies or localStorage (for test mode)
-  const token = req.cookies.get("sb-access-token")?.value
+export async function middleware(req: NextRequest) {
+  // Create a response object
+  const res = NextResponse.next()
 
-  // Log the token and request path for debugging
+  // Create a Supabase client configured to use cookies
+  const supabase = createMiddlewareClient({ req, res })
+
+  // Refresh session if expired - required for Server Components
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  // Log session status for debugging (will appear in server logs)
   console.log(`[Middleware] Path: ${req.nextUrl.pathname}`)
-  console.log(`[Middleware] Token detected: ${token ? "Yes" : "No"}`)
+  console.log(`[Middleware] Session: ${session ? "Active" : "None"}`)
 
-  // Allow access to auth pages and Next.js system paths without authentication
-  if (
-    req.nextUrl.pathname.startsWith("/auth/") ||
-    req.nextUrl.pathname.startsWith("/_next") ||
-    req.nextUrl.pathname === "/"
-  ) {
-    console.log(`[Middleware] Allowing access to public path: ${req.nextUrl.pathname}`)
-    return NextResponse.next()
-  }
-
-  // Redirect to login if trying to access dashboard without a token
-  if (!token && req.nextUrl.pathname.startsWith("/dashboard")) {
-    console.log(`[Middleware] No token, redirecting to login from: ${req.nextUrl.pathname}`)
-
-    // Redirect to test login in preview environments for easier testing
-    if (process.env.VERCEL_ENV === "preview") {
-      return NextResponse.redirect(new URL("/auth/test-login", req.url))
-    }
-
+  // If no session and trying to access protected routes
+  if (!session && req.nextUrl.pathname.startsWith("/dashboard")) {
+    console.log(`[Middleware] No session, redirecting to login from: ${req.nextUrl.pathname}`)
     return NextResponse.redirect(new URL("/auth/login", req.url))
   }
 
-  // For all other paths, proceed
-  console.log(`[Middleware] Proceeding with request to: ${req.nextUrl.pathname}`)
-  return NextResponse.next()
+  // For all other paths, proceed with the response
+  return res
 }
 
 export const config = {
