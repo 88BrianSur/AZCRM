@@ -18,10 +18,18 @@ export async function middleware(req: NextRequest) {
   console.log(`[Middleware] Path: ${req.nextUrl.pathname}`)
   console.log(`[Middleware] Session: ${session ? "Active" : "None"}`)
 
+  // If user is logged in and trying to access login page, redirect to dashboard
+  if (session && req.nextUrl.pathname.startsWith("/auth/login")) {
+    console.log(`[Middleware] User already logged in, redirecting to dashboard`)
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
   // If no session and trying to access protected routes
   if (!session && req.nextUrl.pathname.startsWith("/dashboard")) {
     console.log(`[Middleware] No session, redirecting to login from: ${req.nextUrl.pathname}`)
-    return NextResponse.redirect(new URL("/auth/login", req.url))
+    const redirectUrl = new URL("/auth/login", req.url)
+    redirectUrl.searchParams.set("callbackUrl", req.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
   }
 
   // For all other paths, proceed with the response

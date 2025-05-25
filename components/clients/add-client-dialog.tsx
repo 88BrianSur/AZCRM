@@ -21,7 +21,7 @@ export function AddClientDialog({ open, onOpenChange, onClientAdded }) {
     last_name: "",
     email: "",
     phone: "",
-    admission_date: new Date().toISOString().split("T")[0],
+    intake_date: new Date().toISOString().split("T")[0],
     status: "Active",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -38,9 +38,26 @@ export function AddClientDialog({ open, onOpenChange, onClientAdded }) {
 
     try {
       const supabase = createClientSupabaseClient()
-      const { data, error } = await supabase.from("clients").insert([formData]).select()
+
+      // Ensure we're using the correct column names for the database
+      const dataToInsert = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        intake_date: formData.intake_date,
+        status: formData.status,
+        // Add required fields with default values
+        date_of_birth: "1990-01-01", // Default date, should be updated later
+        gender: "prefer-not-to-say", // Default gender
+      }
+
+      console.log("Inserting client data:", dataToInsert)
+
+      const { data, error } = await supabase.from("clients").insert([dataToInsert]).select()
 
       if (error) {
+        console.error("Supabase error:", error)
         throw error
       }
 
@@ -59,7 +76,7 @@ export function AddClientDialog({ open, onOpenChange, onClientAdded }) {
         last_name: "",
         email: "",
         phone: "",
-        admission_date: new Date().toISOString().split("T")[0],
+        intake_date: new Date().toISOString().split("T")[0],
         status: "Active",
       })
 
@@ -68,7 +85,7 @@ export function AddClientDialog({ open, onOpenChange, onClientAdded }) {
       console.error("Error adding client:", error)
       toast({
         title: "Error",
-        description: "Failed to add client. Please try again.",
+        description: error.message || "Failed to add client. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -131,16 +148,17 @@ export function AddClientDialog({ open, onOpenChange, onClientAdded }) {
               <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="admission_date" className="text-right">
-                Admission Date
+              <Label htmlFor="intake_date" className="text-right">
+                Intake Date
               </Label>
               <Input
-                id="admission_date"
-                name="admission_date"
+                id="intake_date"
+                name="intake_date"
                 type="date"
-                value={formData.admission_date}
+                value={formData.intake_date}
                 onChange={handleChange}
                 className="col-span-3"
+                required
               />
             </div>
           </div>

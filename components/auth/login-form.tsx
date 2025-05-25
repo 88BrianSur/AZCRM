@@ -18,7 +18,28 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [envStatus, setEnvStatus] = useState<"checking" | "ok" | "error">("checking")
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const router = useRouter()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const supabase = createClientSupabaseClient()
+        const { data } = await supabase.auth.getSession()
+
+        if (data.session) {
+          console.log("User already logged in, redirecting to dashboard")
+          // Use window.location for a full page reload to ensure middleware picks up the session
+          window.location.href = callbackUrl
+        }
+      } catch (err) {
+        console.error("Error checking session:", err)
+      }
+    }
+
+    checkSession()
+  }, [callbackUrl])
 
   // Check environment variables on component mount
   useEffect(() => {
@@ -40,6 +61,7 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
+    setDebugInfo(null)
     setIsLoading(true)
 
     // Set a timeout to prevent infinite loading state
@@ -97,13 +119,19 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
         return
       }
 
-      console.log("User authenticated successfully:", {
-        userId: data.user.id,
-        sessionExpiry: new Date(data.session.expires_at! * 1000).toISOString(),
-      })
+      // Show debug info
+      const debugText = `Login successful! User ID: ${data.user.id.substring(0, 6)}...
+Session expires: ${new Date(data.session.expires_at! * 1000).toLocaleString()}
+Redirecting to: ${callbackUrl}`
 
-      // Refresh the page to ensure middleware picks up the new session
-      window.location.href = callbackUrl
+      setDebugInfo(debugText)
+      console.log(debugText)
+
+      // Wait a moment to show the success message
+      setTimeout(() => {
+        // Force a full page reload to ensure the session is picked up
+        window.location.href = callbackUrl
+      }, 1000)
     } catch (err) {
       clearTimeout(timeoutId)
       console.error("Login error:", err)
@@ -130,6 +158,12 @@ export default function LoginForm({ callbackUrl = "/dashboard" }: { callbackUrl?
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {debugInfo && (
+          <Alert className="mb-4 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-800 whitespace-pre-line">{debugInfo}</AlertDescription>
           </Alert>
         )}
 
