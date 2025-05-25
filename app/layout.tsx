@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { getCurrentUser } from "@/lib/auth/mock-auth"
+import { StickySidebar } from "@/components/layout/sticky-sidebar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -32,7 +33,18 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {children}
+          {isAuthPage ? (
+            // Auth pages don't need the sidebar
+            children
+          ) : (
+            // Regular pages get the sidebar layout
+            <div className="min-h-screen bg-background">
+              <StickySidebar />
+              <div className="md:pl-64">
+                <main className="p-4 md:p-6">{children}</main>
+              </div>
+            </div>
+          )}
           <Toaster />
         </ThemeProvider>
       </body>

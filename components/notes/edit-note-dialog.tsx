@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,54 +12,63 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { useToast } from "@/hooks/use-toast"
 
-interface AddNoteDialogProps {
+interface Note {
+  id: string
+  clientId: string
+  title: string
+  content: string
+  createdAt: string
+  authorId?: string
+  createdBy: string
+  type: string
+}
+
+interface EditNoteDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  clientId: string
-  onNoteAdded: (note: any) => void
+  note: Note
+  onNoteUpdated: (note: Note) => void
   usingMockData?: boolean
 }
 
-export function AddNoteDialog({ open, onOpenChange, clientId, onNoteAdded }: AddNoteDialogProps) {
+export function EditNoteDialog({ open, onOpenChange, note, onNoteUpdated }: EditNoteDialogProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category, setCategory] = useState("General")
+  const [category, setCategory] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
-  const resetForm = () => {
-    setTitle("")
-    setContent("")
-    setCategory("General")
-  }
+  useEffect(() => {
+    if (note) {
+      setTitle(note.title)
+      setContent(note.content)
+      setCategory(note.type)
+    }
+  }, [note])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
-      // Create a mock note
-      const mockNote = {
-        id: Math.random().toString(36).substring(2, 15),
-        clientId,
+      // Update the mock note
+      const updatedNote = {
+        ...note,
         title,
         content,
-        createdAt: new Date().toISOString(),
-        createdBy: "Mock User",
         type: category,
       }
 
       // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      onNoteAdded(mockNote)
-      resetForm()
+      onNoteUpdated(updatedNote)
       onOpenChange(false)
     } catch (error: any) {
-      console.error("Error adding note:", error)
+      console.error("Error updating note:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to add note. Please try again.",
+        description: error.message || "Failed to update note. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -68,16 +77,10 @@ export function AddNoteDialog({ open, onOpenChange, clientId, onNoteAdded }: Add
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(newOpen) => {
-        if (!newOpen) resetForm()
-        onOpenChange(newOpen)
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add New Note</DialogTitle>
+          <DialogTitle>Edit Note</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -122,7 +125,7 @@ export function AddNoteDialog({ open, onOpenChange, clientId, onNoteAdded }: Add
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
-              {isSubmitting ? "Adding..." : "Add Note"}
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

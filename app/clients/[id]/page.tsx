@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClientSupabaseClient } from "@/lib/supabase/client"
 import { ClientNotes } from "@/components/clients/client-notes"
 import { ClientMedical } from "@/components/clients/client-medical"
@@ -14,12 +13,14 @@ import { ClientDocuments } from "@/components/clients/client-documents"
 import { EditClientDialog } from "@/components/clients/edit-client-dialog"
 import { Button } from "@/components/ui/button"
 import { LoadingSpinner } from "@/components/loading-spinner"
+import { ClientProfile } from "@/components/clients/client-profile"
 
 export default function ClientPage() {
   const params = useParams()
   const [client, setClient] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     async function fetchClient() {
@@ -45,6 +46,11 @@ export default function ClientPage() {
     }
   }, [params.id])
 
+  const handleClientUpdate = (updatedClient) => {
+    setClient(updatedClient)
+    router.refresh()
+  }
+
   if (loading) {
     return <LoadingSpinner />
   }
@@ -62,32 +68,7 @@ export default function ClientPage() {
         <Button onClick={() => setIsEditOpen(true)}>Edit Client</Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Client Information</CardTitle>
-          <CardDescription>Basic information about the client.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium">Email</p>
-              <p className="text-sm text-muted-foreground">{client.email || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Phone</p>
-              <p className="text-sm text-muted-foreground">{client.phone || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Admission Date</p>
-              <p className="text-sm text-muted-foreground">{new Date(client.admission_date).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">Status</p>
-              <p className="text-sm text-muted-foreground">{client.status}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <ClientProfile client={client} onClientUpdated={handleClientUpdate} />
 
       <Tabs defaultValue="notes">
         <TabsList className="grid grid-cols-3 md:grid-cols-6">
@@ -118,7 +99,12 @@ export default function ClientPage() {
         </TabsContent>
       </Tabs>
 
-      <EditClientDialog open={isEditOpen} onOpenChange={setIsEditOpen} client={client} onClientUpdated={setClient} />
+      <EditClientDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        client={client}
+        onClientUpdated={handleClientUpdate}
+      />
     </div>
   )
 }
